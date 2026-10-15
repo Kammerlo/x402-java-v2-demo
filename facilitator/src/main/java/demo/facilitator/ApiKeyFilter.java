@@ -12,6 +12,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.x402.http.facilitator.FacilitatorHttpHandler;
 
 /**
  * Customization 3, plain Spring around it: /verify and /settle need an {@code X-Api-Key} header,
@@ -24,7 +25,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 class ApiKeyFilter {
 
   @Bean
-  FilterRegistrationBean<OncePerRequestFilter> apiKeyFilterRegistration(@Value("${demo.api-key}") String key) {
+  FilterRegistrationBean<OncePerRequestFilter> apiKeyFilterRegistration(
+      @Value("${demo.api-key}") String key, FacilitatorHttpHandler handler) {
+    if (key.isBlank()) {
+      // An empty key would accept an empty header: refuse to start instead.
+      throw new IllegalStateException("demo.api-key (FACILITATOR_API_KEY) must not be blank");
+    }
     byte[] expected = key.getBytes(StandardCharsets.UTF_8);
     OncePerRequestFilter filter = new OncePerRequestFilter() {
       @Override
@@ -41,7 +47,9 @@ class ApiKeyFilter {
       }
     };
     FilterRegistrationBean<OncePerRequestFilter> registration = new FilterRegistrationBean<>(filter);
-    registration.addUrlPatterns("/x402/verify", "/x402/settle");
+    // Follow x402.facilitator-server.base-path, so changing it can't leave the routes open.
+    String base = handler.basePath();
+    registration.addUrlPatterns(base + "/verify", base + "/settle");
     return registration;
   }
 }

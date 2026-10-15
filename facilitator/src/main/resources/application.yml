@@ -25,8 +25,9 @@ x402:
       max-tx-bytes: 16384        # refuse oversized payment transactions (default 65536)
       networks:
         - network: "cardano:preprod"
-          # No blockfrost: section: MeteredChainBackend supplies the backend. Without that
-          # bean you would write:  blockfrost: { project-id: "${BLOCKFROST_PROJECT_ID}" }
+          # No blockfrost: section: MeteredChainBackend supplies the backend (and sets the
+          # network magic and max tip age itself, as the YAML path would). Without that bean
+          # you would write:  blockfrost: { project-id: "${BLOCKFROST_PROJECT_ID}" }
 
 demo:
   api-key: "${FACILITATOR_API_KEY:demo-secret}"   # ApiKeyFilter; the server sends the same key
