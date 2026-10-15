@@ -11,8 +11,15 @@ import org.x402.spring.facilitator.X402FacilitatorCustomizer;
  * Customization 2a, observe: hooks around every verify and settle. An X402FacilitatorCustomizer
  * bean receives the X402Facilitator before it serves requests; any number of them can exist.
  *
- * <p>After-hooks only observe (book a payment, notify the seller, export metrics). Failure hooks
- * may answer instead of failing by returning {@code Recovery.recovered(response)}.
+ * <p>Which hook sees what:
+ * <ul>
+ *   <li>{@code onAfterVerify}: valid payments only. An invalid one goes to {@code onVerifyFailure}.
+ *   <li>{@code onAfterSettle}: every settle answer, successful or not. Chain-provider outages
+ *       arrive here as {@code success=false} (often "settlement_pending"), not as exceptions.
+ *   <li>{@code onSettleFailure}: only thrown errors, e.g. no scheme registered for the network.
+ *   <li>A before-hook abort (see {@link PayeePolicy}) skips the hooks of that call.
+ * </ul>
+ * Failure hooks may answer instead of failing by returning {@code Recovery.recovered(response)}.
  */
 @Configuration
 class AuditHooks {
@@ -23,10 +30,14 @@ class AuditHooks {
   X402FacilitatorCustomizer auditLogging(FacilitatorStats stats) {
     return facilitator -> facilitator
         .onAfterVerify(ctx -> {
-          stats.increment(ctx.result().isValid() ? "verify.valid" : "verify.invalid");
-          LOG.info("VERIFIED {} {} to {}: valid={} reason={}", ctx.requirements().amount(),
-              ctx.requirements().asset(), ctx.requirements().payTo(), ctx.result().isValid(),
-              ctx.result().invalidReason());
+          stats.increment("verify.valid");
+          LOG.info("VERIFIED {} {} to {}", ctx.requirements().amount(),
+              ctx.requirements().asset(), ctx.requirements().payTo());
+        })
+        .onVerifyFailure(ctx -> {
+          stats.increment("verify.invalid");
+          LOG.info("VERIFY FAILED {}", ctx.error().getMessage());
+          return HookResults.Recovery.none();
         })
         .onAfterSettle(ctx -> {
           stats.increment(ctx.result().success() ? "settle.success" : "settle.failed");
@@ -34,7 +45,8 @@ class AuditHooks {
               ctx.result().success(), ctx.result().errorReason());
         })
         .onSettleFailure(ctx -> {
-          // An exception, not a "no": the chain provider was down, for example.
+          // A thrown error, not a "no": e.g. no scheme for the network. Provider outages don't
+          // land here; the Cardano scheme answers them with success=false.
           stats.increment("settle.error");
           LOG.warn("SETTLE ERROR {}", ctx.error().getMessage());
           return HookResults.Recovery.none();

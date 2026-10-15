@@ -8,9 +8,13 @@ cd "$(dirname "$0")"
 # Load .env line by line (a mnemonic contains spaces, so the file is not sourced).
 [ -f .env ] || { echo "Missing .env: cp .env.example .env and fill it in"; exit 1; }
 while IFS= read -r line || [ -n "$line" ]; do
+  line="${line%$'\r'}"                       # Windows line endings
+  line="${line#export }"
   case "$line" in ''|\#*) continue ;; esac
-  key="${line%%=*}"; value="${line#*=}"
-  value="${value%\"}"; value="${value#\"}"
+  [[ "$line" == *=* ]] || continue
+  key="${line%%=*}"; key="${key//[[:space:]]/}"; value="${line#*=}"
+  case "$value" in \"*\") value="${value:1:${#value}-2}" ;; \'*\') value="${value:1:${#value}-2}" ;; esac
+  [ -n "$value" ] || continue                 # an empty value means "use the default"
   export "$key=$value"
 done < .env
 API_KEY="${FACILITATOR_API_KEY:-demo-secret}"
@@ -19,9 +23,16 @@ for jar in facilitator server client; do
   [ -f "$jar/target/$jar-1.0.0-SNAPSHOT.jar" ] || { echo "Build first: mvn -q package -DskipTests"; exit 1; }
 done
 
-wait_for() {  # url, name
+for port in 8402 8080; do
+  if curl -s -o /dev/null "http://127.0.0.1:$port/"; then
+    echo "Port $port is already in use (an earlier run still going?). Stop it first."; exit 1
+  fi
+done
+
+wait_for() {  # url, name, pid
   for _ in $(seq 1 60); do
     curl -s -o /dev/null "$1" && return 0
+    kill -0 "$3" 2>/dev/null || { echo "$2 exited at startup; see logs/$2.log"; exit 1; }
     sleep 1
   done
   echo "$2 did not start; see logs/$2.log"; exit 1
@@ -32,10 +43,10 @@ mkdir -p logs
 java -jar facilitator/target/facilitator-1.0.0-SNAPSHOT.jar > logs/facilitator.log 2>&1 &
 FACILITATOR=$!
 trap 'kill $FACILITATOR ${SERVER:-} 2>/dev/null || true' EXIT
-wait_for http://127.0.0.1:8402/x402/supported facilitator
+wait_for http://127.0.0.1:8402/x402/supported facilitator "$FACILITATOR"
 java -jar server/target/server-1.0.0-SNAPSHOT.jar > logs/server.log 2>&1 &
 SERVER=$!
-wait_for http://127.0.0.1:8080/api/status server
+wait_for http://127.0.0.1:8080/api/status server "$SERVER"
 echo "facilitator http://127.0.0.1:8402/x402   server http://127.0.0.1:8080   logs in ./logs"
 
 step "1. The server: what is free, what is paid (curl, no payment)"
@@ -62,11 +73,12 @@ curl -s -X POST -H 'Content-Type: application/json' -H "X-Api-Key: $API_KEY" -d 
 echo
 
 step "3. Paying with the Java client (each payment waits for its block, ~20-90 s)"
-java -cp "client/target/client-1.0.0-SNAPSHOT.jar:$(cat client/target/classpath.txt)" demo.client.PayingClient
+java -cp "client/target/client-1.0.0-SNAPSHOT.jar:$(cat client/target/classpath.txt)" demo.client.PayingClient \
+  || echo "client failed (exit $?)"
 
 step "4. What the facilitator saw"
 echo "AuditHooks (log):"
-grep -E "VERIFIED|SETTLED|REFUSED" logs/facilitator.log | sed -E 's/^.* : /   /' || true
+grep -E "VERIFIED|VERIFY FAILED|SETTLED|REFUSED" logs/facilitator.log | sed -E 's/^.* : /   /' || true
 printf "StatsController (GET /stats), filled by the hooks and MeteredChainBackend:\n   "
 curl -s http://127.0.0.1:8402/stats
 echo

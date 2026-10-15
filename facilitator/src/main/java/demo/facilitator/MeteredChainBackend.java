@@ -1,6 +1,8 @@
 package demo.facilitator;
 
 import com.bloxbean.cardano.client.api.model.ProtocolParams;
+import java.time.Clock;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,6 +11,7 @@ import org.x402.mechanisms.cardano.chain.CardanoChainBackend;
 import org.x402.mechanisms.cardano.chain.SettlementEvidence;
 import org.x402.mechanisms.cardano.chain.SubmissionResult;
 import org.x402.mechanisms.cardano.chain.UtxoSnapshot;
+import org.x402.spring.facilitator.X402FacilitatorServerProperties;
 
 /**
  * Customization 4, replace a building block: the chain backend. A CardanoChainBackend bean takes
@@ -20,6 +23,11 @@ import org.x402.mechanisms.cardano.chain.UtxoSnapshot;
  * Ogmios or Koios. When you wrap, delegate <b>every</b> method, the default ones too: a default
  * you forget silently switches a capability off (evidence lookups, phase-1 validation, the
  * "never sent" check the facilitator uses to retry safely).
+ *
+ * <p>A backend you build yourself also gets none of the settings the YAML path would apply. The
+ * Blockfrost provider checks need {@code networkMagic} (is this really preprod?) and
+ * {@code maxTipAge} (is the provider's index fresh?). Without them, a lagging index could report a
+ * spent input as unspent. So the registration below sets them as the YAML path does.
  */
 final class MeteredChainBackend implements CardanoChainBackend {
 
@@ -35,11 +43,17 @@ final class MeteredChainBackend implements CardanoChainBackend {
   static class Registration {
     @Bean
     CardanoChainBackend meteredChainBackend(
-        @Value("${demo.blockfrost-project-id}") String projectId, FacilitatorStats stats) {
+        @Value("${demo.blockfrost-project-id}") String projectId,
+        X402FacilitatorServerProperties properties, ObjectProvider<Clock> clock,
+        FacilitatorStats stats) {
       BlockfrostChainBackend blockfrost = new BlockfrostChainBackend(
           BlockfrostChainBackend.Config.builder()
-              .network("cardano:preprod")
+              // The network the YAML configures (this demo has one).
+              .network(properties.cardano().networks().get(0).network())
               .projectId(projectId)
+              .networkMagic(1)                                    // preprod's; mainnet 764824073
+              .maxTipAge(properties.cardano().maxTipAge())        // default 5m
+              .clock(clock.getIfAvailable(Clock::systemUTC))
               .build());
       return new MeteredChainBackend(blockfrost, stats);
     }

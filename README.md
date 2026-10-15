@@ -71,9 +71,9 @@ GET /api/reports/ada-usd -> HTTP 200
 == 4. What the facilitator saw
 AuditHooks (log):
    REFUSED payment to addr_test1vz09…: not an allowed payee
-   VERIFIED 1000000 lovelace to addr_test1qzd…: valid=true
+   VERIFIED 1000000 lovelace to addr_test1qzd…
    SETTLED  tx=66a996fd…: success=true
-   VERIFIED 2000000 lovelace to addr_test1qzd…: valid=true
+   VERIFIED 2000000 lovelace to addr_test1qzd…
    SETTLED  tx=d3e3dc83…: success=true
 StatsController (GET /stats), filled by the hooks and MeteredChainBackend:
    {"chain.getTransactionEvidence":22,"chain.getUtxo":4,"chain.submitTransaction":2,
@@ -122,10 +122,10 @@ Price in USDM, the network's default stablecoin, by writing `price: "$0.01"` ins
 | # | How | Class | What it does |
 |---|---|---|---|
 | 1 | **Configuration** | [`application.yml`](facilitator/src/main/resources/application.yml) | Confirmation timeout and poll interval, mempool acceptance, maximum transaction size, networks. |
-| 2a | **Hooks: observe** | [`AuditHooks`](facilitator/src/main/java/demo/facilitator/AuditHooks.java) | `onAfterVerify` / `onAfterSettle` log and count every payment; `onSettleFailure` sees exceptions. This is where bookkeeping, notifications or metrics go. |
+| 2a | **Hooks: observe** | [`AuditHooks`](facilitator/src/main/java/demo/facilitator/AuditHooks.java) | `onAfterVerify` sees valid payments, `onVerifyFailure` invalid ones; `onAfterSettle` sees every settle answer (provider outages arrive as `success=false`); `onSettleFailure` only thrown errors. A before-hook abort skips them all. This is where bookkeeping, notifications or metrics go. |
 | 2b | **Hooks: refuse** | [`PayeePolicy`](facilitator/src/main/java/demo/facilitator/PayeePolicy.java) | `onBeforeVerify` / `onBeforeSettle` return `Decision.abort("payee_not_allowed")` for sellers you don't serve. The transaction is never submitted. The rule is on both, since settle can be called without verify. |
-| 3 | **Plain Spring around it** | [`ApiKeyFilter`](facilitator/src/main/java/demo/facilitator/ApiKeyFilter.java) | `/verify` and `/settle` require an `X-Api-Key` header; `/supported` stays public. The server sends the key through `x402.facilitators[].headers`. Spring Security works the same way. |
-| 4 | **Replace a building block** | [`MeteredChainBackend`](facilitator/src/main/java/demo/facilitator/MeteredChainBackend.java) | A `CardanoChainBackend` bean replaces the Blockfrost backend the YAML would build. This one wraps Blockfrost and counts calls; yours could use your own node, Ogmios or Koios. A `SettlementClaimStore` bean (a database instead of memory) plugs in the same way. |
+| 3 | **Plain Spring around it** | [`ApiKeyFilter`](facilitator/src/main/java/demo/facilitator/ApiKeyFilter.java) | `/verify` and `/settle` (under whatever `base-path` is set) require an `X-Api-Key` header; `/supported` stays public; a blank key refuses to start. The server sends the key through `x402.facilitators[].headers`. Spring Security works the same way. |
+| 4 | **Replace a building block** | [`MeteredChainBackend`](facilitator/src/main/java/demo/facilitator/MeteredChainBackend.java) | A `CardanoChainBackend` bean replaces the Blockfrost backend the YAML would build. This one wraps Blockfrost and counts calls; yours could use your own node, Ogmios or Koios. A backend you build yourself must set what the YAML path would (network magic, max tip age), or the provider safety checks are off. A `SettlementClaimStore` bean (a database instead of memory) plugs in the same way. |
 | 5 | **Your own endpoints** | [`StatsController`](facilitator/src/main/java/demo/facilitator/StatsController.java) | `GET /stats` shows what the hooks and the backend counted. The facilitator is an ordinary Spring Boot app. |
 
 Hooks come from `X402FacilitatorCustomizer` beans, and you can have as many as you like:

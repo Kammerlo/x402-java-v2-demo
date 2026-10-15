@@ -45,7 +45,7 @@
         </executions>
       </plugin>
       <plugin>
-        <!-- mvn -q -pl client exec:java [-Dexec.args=http://127.0.0.1:8080/joke] -->
+        <!-- mvn -q -pl client exec:java [-Dexec.args=http://127.0.0.1:8080/api/weather/lisbon] -->
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
         <version>3.5.0</version>
