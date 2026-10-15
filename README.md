@@ -2,10 +2,26 @@
 
 A complete x402 setup in Java on Cardano preprod: a **facilitator**, a **paid API** and a **paying client**, each one small Maven module. It shows the two ways to make an endpoint paid, the ways to customize a facilitator, and a client that pays without any Spring.
 
-```
-PayingClient ──GET /api/weather/lisbon──▶ server ──/verify, /settle──▶ facilitator ──▶ Cardano preprod
-             ◀── 402 + PAYMENT-REQUIRED ──┘   X402ServletFilter        ExactCardanoFacilitatorScheme
-             ── same GET + PAYMENT-SIGNATURE ──▶ … ──▶ 200 + data + PAYMENT-RESPONSE (receipt)
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as client<br/>PayingClient
+    participant S as server<br/>X402ServletFilter
+    participant F as facilitator<br/>ExactCardanoFacilitatorScheme
+    participant L as Cardano preprod
+
+    C->>S: GET /api/weather/lisbon
+    S-->>C: 402 + PAYMENT-REQUIRED (1 tADA to PAY_TO)
+    Note over C: wallet signs a payment tx (not broadcast)
+    C->>S: GET /api/weather/lisbon + PAYMENT-SIGNATURE
+    S->>F: POST /x402/verify
+    F->>L: look up inputs
+    F-->>S: isValid: true
+    Note over S: controller runs, response held back
+    S->>F: POST /x402/settle
+    F->>L: submit tx, wait for its block
+    F-->>S: success: true + tx id
+    S-->>C: 200 + data + PAYMENT-RESPONSE (receipt)
 ```
 
 ## Run it
