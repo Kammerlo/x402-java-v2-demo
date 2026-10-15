@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>demo</groupId>
+    <artifactId>x402-java-v2-demo</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+  </parent>
+  <artifactId>client</artifactId>
+
+  <!-- No Spring here: plain java.net.http plus the SDK core and the Cardano scheme. -->
+  <dependencies>
+    <dependency>
+      <groupId>org.x402</groupId>
+      <artifactId>x402-core</artifactId>
+      <version>${x402.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.x402</groupId>
+      <artifactId>x402-mechanism-cardano</artifactId>
+      <version>${x402.version}</version>
+    </dependency>
+    <!-- A logger for the libraries underneath (cardano-client-lib); warnings and up only. -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <!-- Writes target/classpath.txt so run.sh can start the client with plain java. -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals><goal>build-classpath</goal></goals>
+            <configuration><outputFile>${project.build.directory}/classpath.txt</outputFile></configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <!-- mvn -q -pl client exec:java [-Dexec.args=http://127.0.0.1:8080/joke] -->
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.5.0</version>
+        <configuration>
+          <mainClass>demo.client.PayingClient</mainClass>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

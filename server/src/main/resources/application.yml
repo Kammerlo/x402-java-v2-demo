@@ -1,0 +1,39 @@
+# The resource server: a small data API on Cardano preprod.
+#   GET /api/status               free
+#   GET /api/weather/{city}       paid; the controller method carries @X402Payment("weather")
+#   GET /api/reports/{market}     paid; protected here by `path:`, the controller has no x402 code
+
+server:
+  port: 8080
+
+x402:
+  facilitators:                  # who verifies and settles payments (the demo facilitator module)
+    - url: "${FACILITATOR_URL:http://127.0.0.1:8402/x402}"
+      headers:                   # the demo facilitator wants an API key on /verify and /settle
+        verify: { X-Api-Key: "${FACILITATOR_API_KEY:demo-secret}" }
+        settle: { X-Api-Key: "${FACILITATOR_API_KEY:demo-secret}" }
+
+  accounts:                      # where you get paid
+    seller:
+      network: "cardano:preprod"
+      pay-to: "${PAY_TO}"        # your preprod address
+
+  routes:                        # offers: what costs what
+    # Option A: protected by an annotation. @X402Payment("weather") on the controller method
+    # refers to this name; the offer itself has no path.
+    weather:
+      description: Current weather for a city
+      mime-type: application/json
+      accepts:
+        - account: seller
+          price: { amount: "1000000", asset: lovelace }   # 1 tADA
+
+    # Option B: protected by configuration alone. `path:` uses x402 route syntax
+    # (* and :param); every matching request is paid, whatever controller serves it.
+    market-report:
+      path: "GET /api/reports/:market"
+      description: Daily market report
+      mime-type: application/json
+      accepts:
+        - account: seller
+          price: { amount: "2000000", asset: lovelace }   # 2 tADA

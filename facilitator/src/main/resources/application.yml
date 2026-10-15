@@ -1,0 +1,34 @@
+# The facilitator: verifies payments and puts them on chain for resource servers.
+# Serves GET /x402/supported, POST /x402/verify, POST /x402/settle, plus GET /stats (demo).
+#
+# Ways to adjust it, from least to most code:
+#   1. Configuration: the keys below (every key with its default: application-reference.yml
+#      in the SDK's examples/java/servers/spring-boot).
+#   2. Hooks: AuditHooks (observe) and PayeePolicy (refuse), via X402FacilitatorCustomizer beans.
+#   3. Plain Spring around it: ApiKeyFilter protects /verify and /settle.
+#   4. Replace a building block: MeteredChainBackend is a CardanoChainBackend bean that takes
+#      the place of the Blockfrost backend the YAML would otherwise build.
+
+server:
+  address: 127.0.0.1             # demo: local only
+  port: 8402
+
+x402:
+  enabled: false                 # this app is a facilitator, not a paid resource server
+  facilitator-server:
+    enabled: true
+    base-path: /x402
+    cardano:
+      confirmation-timeout: 75s  # how long settle waits for the block (keep below 85s)
+      confirmation-poll: 5s      # how often it looks
+      accept-mempool: false      # true = answer success once the tx is in the mempool (riskier)
+      max-tx-bytes: 16384        # refuse oversized payment transactions (default 65536)
+      networks:
+        - network: "cardano:preprod"
+          # No blockfrost: section: MeteredChainBackend supplies the backend. Without that
+          # bean you would write:  blockfrost: { project-id: "${BLOCKFROST_PROJECT_ID}" }
+
+demo:
+  api-key: "${FACILITATOR_API_KEY:demo-secret}"   # ApiKeyFilter; the server sends the same key
+  allowed-payees: "${PAY_TO}"                     # PayeePolicy; comma-separated addresses
+  blockfrost-project-id: "${BLOCKFROST_PROJECT_ID}"
