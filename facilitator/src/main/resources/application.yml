@@ -21,6 +21,7 @@ x402:
     cardano:
       confirmation-timeout: 75s  # how long settle waits for the block (keep below 85s)
       confirmation-poll: 5s      # how often it looks
+      settle-timeout: 75s        # bound on one whole settle; then the answer is settlement_pending
       accept-mempool: false      # true = answer success once the tx is in the mempool (riskier)
       max-tx-bytes: 16384        # refuse oversized payment transactions (default 65536)
       networks:

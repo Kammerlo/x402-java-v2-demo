@@ -53,6 +53,7 @@ final class MeteredChainBackend implements CardanoChainBackend {
               .projectId(projectId)
               .networkMagic(1)                                    // preprod's; mainnet 764824073
               .maxTipAge(properties.cardano().maxTipAge())        // default 5m
+              .awaitConfirmation(false)  // the scheme waits for the block itself, within settle-timeout
               .clock(clock.getIfAvailable(Clock::systemUTC))
               .build());
       return new MeteredChainBackend(blockfrost, stats);

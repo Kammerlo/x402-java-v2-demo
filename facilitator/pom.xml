@@ -11,10 +11,16 @@
   <artifactId>facilitator</artifactId>
 
   <dependencies>
-    <!-- One dependency: the starter brings the facilitator server and the Cardano scheme. -->
+    <!-- The starter brings the facilitator server; the mechanism below brings the Cardano scheme. -->
     <dependency>
       <groupId>org.x402</groupId>
       <artifactId>x402-spring-boot-starter</artifactId>
+      <version>${x402.version}</version>
+    </dependency>
+    <!-- The payment mechanism: the starter brings none, you add the chains you accept. -->
+    <dependency>
+      <groupId>org.x402</groupId>
+      <artifactId>x402-mechanism-cardano</artifactId>
       <version>${x402.version}</version>
     </dependency>
     <dependency>
