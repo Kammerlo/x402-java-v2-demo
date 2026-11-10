@@ -34,7 +34,7 @@ You need Java 17+ and Maven, plus three things from preprod:
 
 ```bash
 # 1. The SDK is not on Maven Central yet: install it from the x402 repo once.
-git clone -b feat/java-v2-spring-starter https://github.com/Kammerlo/x402.git
+git clone -b feat/java-v2-spring-starter https://github.com/cardano-foundation/x402.git
 mvn -f x402/java/pom.xml -q install -DskipTests
 
 # 2. Build the demo and configure it.
